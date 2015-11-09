@@ -11,6 +11,7 @@ import (
 	"strconv"
 )
 
+// This struct contains the filters to be set on the data when it is called.
 type ListingFilter struct {
 	minPrice int
 	maxPrice int
@@ -19,6 +20,10 @@ type ListingFilter struct {
 	minBed   int
 	maxBed   int
 }
+
+/**
+*All the below structs are used to create the json return value
+ */
 type ListingCollection struct {
 	Collection string    `json:"type"`
 	Listings   []Listing `json:"features"`
@@ -44,12 +49,14 @@ type ListingProperties struct {
 	Area        int    `json:"sq_ft"`
 }
 
+// This function creates a new Listing filter with default values
 func NewListingFilter() ListingFilter {
 	filter := ListingFilter{minPrice: 0, maxPrice: math.MaxInt64,
 		minBath: 0, maxBath: math.MaxInt64, minBed: 0, maxBed: math.MaxInt64}
 	return filter
 }
 
+// Resets the filter values after a request has been served
 func (filter *ListingFilter) ResetFilter() {
 	filter.minPrice = 0
 	filter.maxPrice = math.MaxInt64
@@ -59,8 +66,9 @@ func (filter *ListingFilter) ResetFilter() {
 	filter.maxBed = math.MaxInt64
 }
 
+// This function is the function handler for http requests
 func (filter *ListingFilter) ReceiveAndRespondRequest(res http.ResponseWriter, req *http.Request) {
-	fmt.Printf("Received request")
+	// Get all the parameter values
 	minPrice := req.URL.Query().Get("min_price")
 	if len(minPrice) != 0 {
 		price, err := strconv.Atoi(minPrice)
@@ -115,44 +123,41 @@ func (filter *ListingFilter) ReceiveAndRespondRequest(res http.ResponseWriter, r
 			filter.maxBed = bed
 		}
 	}
-	fmt.Printf("Read parameters")
+	// Build the JSON from filter parameters given
 	data := filter.buildJSONFromFilter()
 	_, err := res.Write(data)
-	fmt.Printf("Wrote data")
 	if err != nil {
 		fmt.Errorf("Error in sending data: %v", err)
 	}
 	filter.ResetFilter()
 }
 
+// Given the filter parameter then creates a JSON file to return back to the client
 func (filter *ListingFilter) buildJSONFromFilter() []byte {
 	var listings []Listing
+	// Open csv file
 	csvfile, err := os.Open("pkg/listings.csv")
 	if err != nil {
 
 		fmt.Errorf("Error in opening csv file: %v", err)
 	}
-	fmt.Printf("Opened csv file")
+
 	defer csvfile.Close()
 	reader := csv.NewReader(csvfile)
-	fmt.Printf("Starting to read csv file")
 	counter := 0
 	for {
 		record, err := reader.Read()
-
-		//fmt.Println(record)
 		counter++
 		if err != nil {
 			if err == io.EOF {
-				fmt.Printf("End of file")
 				break
 			}
 			fmt.Errorf("Error in reading csv file: %v", err)
 			continue
 		}
-		fmt.Printf("Before creating record\n")
+		// Create a listing struct from each record
 		listing := filter.createListingFromRecord(record)
-		fmt.Printf("Read Record %s", record[0])
+		// Check whether the listing comes under the filters
 		if filter.checkRecordMatchesFilter(listing) {
 			listings = append(listings, listing)
 		}
@@ -165,6 +170,7 @@ func (filter *ListingFilter) buildJSONFromFilter() []byte {
 	return Body
 }
 
+// Thus function checks whehter the listing satisfies the parameters given in the GET request
 func (filter *ListingFilter) checkRecordMatchesFilter(listing Listing) bool {
 	if listing.Properties.Price >= filter.minPrice && listing.Properties.Price <= filter.maxPrice {
 		if listing.Properties.NumBedroom >= filter.minBed && listing.Properties.NumBedroom <= filter.maxBed {
@@ -176,6 +182,7 @@ func (filter *ListingFilter) checkRecordMatchesFilter(listing Listing) bool {
 	return false
 }
 
+// This function basically read the csv file and creates the listing struct
 func (filter *ListingFilter) createListingFromRecord(record []string) Listing {
 
 	price, err := strconv.Atoi(record[3])
@@ -207,6 +214,5 @@ func (filter *ListingFilter) createListingFromRecord(record []string) Listing {
 	properties := ListingProperties{ID: record[0], Price: price, Address: record[1],
 		NumBedroom: bed, NumBathroom: bath, Area: area}
 	listing := Listing{Type: "Feature", Geometry: loc, Properties: properties}
-	fmt.Printf("Returning record\n")
 	return listing
 }
