@@ -1,5 +1,8 @@
 {
 	"ImportPath": "github.com/OpendoorListings/Listing",
 	"GoVersion": "go1.5",
+	"Packages": [
+		"./..."
+	],
 	"Deps": []
 }
